@@ -79,7 +79,18 @@ xdotool search --name "Discord" windowactivate key Return   # contoh interaksi
 
 ```bash
 nohup bash keepalive.sh > /dev/null 2>&1 &    # mulai: simulasi aktivitas tiap 5 menit
+pgrep -f keepalive.sh                          # cek status (tampil PID = jalan)
 pkill -f keepalive.sh                          # hentikan
+```
+
+**Tidak perlu membuka 2 terminal.** Perintah di atas menjalankan keepalive di *latar belakang* dengan `nohup ... &`, sehingga terminal yang sama tetap bisa dipakai untuk perintah lain, dan prosesnya selamat meski tab/browser ditutup. Kamu cukup satu terminal untuk semuanya:
+
+```bash
+# contoh alur lengkap dalam SATU terminal:
+bash install-desktop.sh
+bash start-desktop.sh
+nohup bash keepalive.sh > /dev/null 2>&1 &     # <- masuk background, terminal tetap bebas
+chromium https://discord.com/app &             # aplikasi lain juga bisa &
 ```
 
 Opsional watchdog (auto-restart stack desktop jika ada proses mati):
