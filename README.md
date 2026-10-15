@@ -32,6 +32,21 @@ nohup bash keepalive.sh >/dev/null 2>&1 &
 ```
 Cek: `pgrep -f keepalive.sh` · Hentikan: `pkill -f keepalive.sh`
 
+## Reset / Mulai Ulang
+Pakai skrip `reset.sh` yang tersedia di repo:
+
+- **Reset ringan** (hapus container + sisa proses & log, image tetap disimpan agar start ulang cepat):
+```bash
+bash reset.sh
+bash docker-desktop.sh   # jalankan ulang desktop
+```
+- **Reset berat** (hapus SEMUA image & cache docker — pakai ini jika disk penuh ±2–3 GB):
+```bash
+bash reset.sh --full
+bash docker-desktop.sh
+```
+- **Reset total instance Cloud Shell** (hapus `$HOME`, kembali seperti baru — cara resmi via browser): buka shell.cloud.google.com → ikon ⚙️ **Settings** → **Reset shell**.
+
 ## Perintah Berguna
 | Kebutuhan | Perintah |
 |---|---|
@@ -39,6 +54,7 @@ Cek: `pgrep -f keepalive.sh` · Hentikan: `pkill -f keepalive.sh`
 | Lihat log desktop | `docker logs lxde` |
 | Restart desktop | `docker restart lxde` |
 | Hapus total | `docker rm -f lxde` |
+| Reset desktop (skrip) | `bash reset.sh` atau `bash reset.sh --full` |
 | Buka terminal GUI di desktop | menu LXDE → Terminal (xterm) |
 
 ## Catatan Penting
