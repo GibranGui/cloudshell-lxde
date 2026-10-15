@@ -21,6 +21,20 @@ pkill lxsession 2>/dev/null || true
 rm -f /tmp/.X11-unix/X99 /tmp/.X99-lock 2>/dev/null || true
 sleep 1
 
+# Deteksi dini: apakah paket desktop sudah terpasang?
+MISSING=""
+command -v Xvfb   >/dev/null 2>&1 || MISSING="$MISSING xvfb"
+command -v x11vnc >/dev/null 2>&1 || MISSING="$MISSING x11vnc"
+command -v startlxde >/dev/null 2>&1 || MISSING="$MISSING lxde"
+{ [ -x /usr/share/novnc/utils/novnc_proxy ] || command -v websockify >/dev/null 2>&1; } \
+  || MISSING="$MISSING novnc/websockify"
+if [ -n "$MISSING" ]; then
+  echo "ERROR: Paket belum terpasang:$MISSING"
+  echo "Jalankan DULU: bash install-desktop.sh"
+  echo "(Cloud Shell instance baru selalu kosong — instalasi harus diulang tiap sesi/restart 24 jam)"
+  exit 1
+fi
+
 echo "[2/5] Menjalankan X server virtual (Xvfb $DISPLAY)..."
 Xvfb $DISPLAY -screen 0 $RES >/tmp/xvfb.log 2>&1 &
 sleep 2
