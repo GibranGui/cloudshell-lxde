@@ -1,173 +1,209 @@
-# Cloud Shell LXDE — Panduan Lengkap
+# Cloud Shell LXDE — Panduan Instalasi MANUAL
 
-Panduan menjalankan desktop **LXDE** di **Google Cloud Shell** dan mengaksesnya lewat VNC/noVNC dari browser maupun Termux (HP Android). Termasuk cara menjaga sesi tetap hidup, menyambung ulang setelah koneksi putus, dan mereset disk ketika penuh.
-
-> Cocok untuk skenario: membuka Discord + game berbasis tombol klik (button) di desktop LXDE, dibiarkan berjalan meski browser/HP ditutup. Perlu diingat: sesi Cloud Shell punya batas **±24 jam**, jadi restart harian tetap diperlukan.
+Panduan **langkah demi langkah secara manual** (tanpa skrip otomatis) untuk menjalankan
+desktop **LXDE** di **Google Cloud Shell** dan mengaksesnya lewat browser via noVNC.
+Cara ini dipilih karena lebih mudah didiagnosa: setiap langkah dijalankan satu per satu,
+sehingga kalau ada error, langsung terlihat di langkah mana.
 
 ---
 
-## 0. Prasyarat & fakta penting
+## Fakta penting sebelum mulai
 
 | Hal | Keterangan |
 |---|---|
 | OS Cloud Shell | Debian 12, sudo tanpa password, ~5 GB RAM |
-| Batas idle | 60 menit tanpa aktivitas terminal → instance dihentikan (akali dengan `keepalive.sh`) |
-| Batas keras | Instance berhenti otomatis setiap ±24 jam — **tidak bisa dilewati skrip apa pun** |
-| Disk persisten | Hanya `$HOME` (~5 GB) yang bertahan antar sesi; paket `apt` hilang saat restart |
-| Browser/HP ditutup | Proses latar belakang (desktop, macro, Discord) **tetap jalan** selama instance hidup |
+| Batas idle | 60 menit tanpa aktivitas terminal → instance mati (lihat Langkah 7 keep-alive) |
+| Batas keras | Instance berhenti otomatis setiap ±24 jam — tidak bisa dilewati |
+| Persisten | Hanya `$HOME` yang bertahan; paket `apt` hilang saat restart → ulangi Langkah 1–6 tiap hari |
+| Browser/HP ditutup | Proses latar belakang (desktop, Discord, macro) tetap jalan selama instance hidup |
 
 ---
 
-## 1. Reset disk Cloud Shell (jika internal penuh)
+## Langkah 0 — Reset disk jika penuh
 
-Dua tingkat reset:
+Jika muncul error disk penuh:
 
-### a) Reset ringan (hapus paket desktop saja)
+- **Cara resmi:** buka https://shell.cloud.google.com → klik ikon **⚙️ Settings** → **"Reset shell"**.
+  ⚠️ Ini menghapus SEMUA isi `$HOME`. Simpan dulu file penting ke GitHub.
+- **Reset ringan (hapus paket desktop saja):**
+  ```bash
+  pkill -f 'Xvfb :99'; pkill x11vnc; pkill -f websockify; pkill -f novnc
+  sudo apt-get purge -y lxde x11vnc novnc websockify
+  sudo apt-get autoremove -y
+  df -h /
+  ```
+
+Setelah reset total, mulai dari Langkah 1 lagi.
+
+---
+
+## Langkah 1 — Install paket (jalankan manual, bukan skrip)
+
+Salin perintah ini **apa adanya** ke terminal Cloud Shell:
+
 ```bash
-bash reset-desktop.sh
+sudo apt-get update
 ```
-Menghentikan semua proses X/VNC dan purge paket `lxde`, `x11vnc`, `novnc`, dll. File di `$HOME` tidak tersentuh.
 
-### b) Reset total (factory reset, hapus seluruh `$HOME`)
-Lewat UI browser (paling aman & resmi):
-1. Buka [shell.cloud.google.com](https://shell.cloud.google.com)
-2. Klik ikon **⚙️ Settings** (pojok kanan atas bar biru)
-3. Pilih **"Reset shell"** → konfirmasi
+Lalu:
 
-Atau lihat panduan perintah:
 ```bash
-bash factory-reset.sh   # tampilkan perintah rm -rf $HOME, jalankan manual setelah simpan data
+sudo apt-get install -y --no-install-recommends \
+  lxde x11vnc novnc websockify dbus-x11 xterm xdotool net-tools
 ```
-> ⚠️ Reset total menghapus SEMUA isi `$HOME`. Simpan dulu file penting (`git push`, atau unduh via menu ⋮ → Download).
 
-Cek pemakaian disk sebelum/sesudah reset:
+Tunggu sampai selesai (±150 MB download). Setelah itu **verifikasi instalasi**:
+
 ```bash
-df -h / $HOME
+which Xvfb x11vnc lxsession startlxde
+ls /usr/share/novnc/utils/novnc_proxy
+```
+
+✅ Jika semua menampilkan path (contoh `/usr/bin/Xvfb`), instalasi berhasil.
+❌ Jika ada yang kosong/keluar pesan `not found`, berarti Langkah 1 belum selesai atau gagal —
+ulangi `sudo apt-get update` lalu install lagi. **Jangan lanjut sebelum semua terdeteksi.**
+
+> Error umum: `start-desktop.sh: line 25: Xvfb: command not found`
+> Artinya paket belum terpasang di instance ini (instance baru setelah reset/restart 24 jam).
+> Solusinya: jalankan ulang Langkah 1.
+
+---
+
+## Langkah 2 — Bersihkan sesi lama
+
+```bash
+pkill -f 'Xvfb :99'
+pkill x11vnc
+pkill -f websockify
+rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
+```
+
+(Aman dijalankan walau tidak ada proses lama — abaikan pesan "no process found".)
+
+---
+
+## Langkah 3 — Jalankan X server virtual (Xvfb)
+
+```bash
+nohup Xvfb :99 -screen 0 1280x800x24 >/tmp/xvfb.log 2>&1 &
+sleep 3
+pgrep -a Xvfb
+export DISPLAY=:99
+```
+
+✅ `pgrep -a Xvfb` harus menampilkan baris seperti `12345 Xvfb :99 ...`
+❌ Jika kosong → lihat errornya: `cat /tmp/xvfb.log` (biasanya `command not found` = kembali ke Langkah 1)
+
+---
+
+## Langkah 4 — Jalankan LXDE desktop
+
+```bash
+eval "$(dbus-launch --sh-syntax)"
+nohup lxsession >/tmp/lxsession.log 2>&1 &
+sleep 2
+nohup startlxde >/tmp/startlxde.log 2>&1 &
+sleep 4
+pgrep -a openbox
+pgrep -a lxpanel
+```
+
+✅ Keduanya harus menampilkan proses = desktop sudah jalan.
+❌ Jika kosong → `cat /tmp/startlxde.log` dan `cat /tmp/lxsession.log` untuk melihat errornya.
+
+---
+
+## Langkah 5 — Jalankan VNC server (port 5900)
+
+```bash
+nohup x11vnc -display :99 -forever -shared -rfbport 5900 -localhost >/tmp/x11vnc.log 2>&1 &
+sleep 3
+netstat -ltn | grep 5900
+```
+
+✅ Harus muncul baris `... 127.0.0.1:5900 ... LISTEN`
+❌ Jika tidak → `tail -20 /tmp/x11vnc.log` (jika `command not found` = kembali ke Langkah 1)
+
+> ⚠️ Port 5900 adalah protokol VNC mentah — TIDAK BISA dibuka di browser. Jangan coba akses 5900 dari browser.
+
+---
+
+## Langkah 6 — Jalankan noVNC bridge (port 6080) + verifikasi
+
+```bash
+nohup /usr/share/novnc/utils/novnc_proxy --vnc localhost:5900 --listen 6080 >/tmp/novnc.log 2>&1 &
+sleep 4
+curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:6080/vnc.html
+```
+
+✅ Harus menampilkan `HTTP 200`
+❌ Selain itu → `tail -20 /tmp/novnc.log` dan pastikan path `/usr/share/novnc/utils/novnc_proxy` ada (`ls` di Langkah 1).
+
+### Buka desktop di browser
+
+1. Di jendela terminal Cloud Shell, lihat **link port 6080** yang otomatis muncul di bawah terminal → klik.
+2. ATAU klik ikon **"Web preview"** (jendela + gigi) di kanan atas terminal → **Change configuration** → masukkan port **6080** → **Save & Run**.
+3. URL terbuka seperti `https://...cs-xxxx-6080.cs.cloudshell.dev` → klik **Connect** (tanpa password).
+4. Desktop LXDE muncul. ✔
+
+> ❗ Jangan ketik `localhost:6080` atau `5900` manual di browser HP/Termux — itu hanya berlaku di dalam mesin Cloud Shell. Akses resmi hanya lewat Web Preview di atas.
+
+---
+
+## Langkah 7 — Keep-alive (anti timeout 60 menit)
+
+Jalankan di terminal yang sama (proses di latar belakang, tidak perlu terminal kedua):
+
+```bash
+nohup bash -c 'while true; do sleep 300; printf " "; done' >/dev/null 2>&1 &
+```
+
+Cek: `pgrep -fa "sleep 300"` → hentikan: `pkill -f "sleep 300"`
+
+Ingat: keep-alive hanya mencegah idle-timeout 60 menit. **Batas 24 jam tetap tidak bisa dilewati** — setelah itu instance mati dan kamu harus mengulang Langkah 1–7 (file di `$HOME` aman).
+
+---
+
+## Langkah 8 — Macro klik (misal tombol game/Discord)
+
+Di dalam desktop LXDE (jendela Terminal), contoh memakai `xdotool`:
+
+```bash
+export DISPLAY=:99
+xdotool mousemove 640 400 click 1     # geser mouse & klik kiri
+xdotool type "halo"                   # mengetik
+```
+
+Loop sederhana tiap 60 detik:
+```bash
+while true; do xdotool mousemove 640 400 click 1; sleep 60; done
 ```
 
 ---
 
-## 2. Instalasi LXDE (dari awal)
+## Diagnosa cepat (kalau macet, cek tabel ini)
 
-```bash
-git clone https://github.com/GibranGui/cloudshell-lxde && cd cloudshell-lxde
-bash install-desktop.sh     # apt install lxde x11vnc novnc websockify dbus-x11 xterm (~150 MB)
-bash start-desktop.sh       # Xvfb :99 → lxsession/startlxde → x11vnc:5900 → noVNC:6080
-```
+| Gejala | Penyebab | Solusi |
+|---|---|---|
+| `Xvfb: command not found` | Paket belum terpasang di instance ini | Ulangi Langkah 1, verifikasi dengan `which Xvfb` |
+| Skrip macet tanpa pesan | Paket hilang / proses lama menggantung | Ikuti panduan manual Langkah 0–6 di atas |
+| `5900` ditolak browser | Salah konsep: 5900 bukan HTTP | Pakai port **6080** via Web Preview |
+| `localhost:6080` dari HP gagal | Tidak ada tunnel ke mesin Cloud Shell | Pakai Web Preview, atau SSH tunnel Termux |
+| CORS/error 403 di preview | Bug Cloud Shell lama | Reload halaman, atau buka link port dari bawah terminal |
+| Desktop hitam/blank | LXDE mati | `cat /tmp/startlxde.log`, ulangi Langkah 4 |
+| Sesi hilang tiap hari | Batas 24 jam Google | Normal — ulangi Langkah 1–7 setiap hari |
+| Disk penuh | Image/paket menumpuk | Reset via ⚙️ Settings → Reset shell |
 
-`start-desktop.sh` bersifat idempoten — jalankan ulang kapan saja untuk restart stack tanpa instalasi ulang.
-
-### Buka desktop di browser (PENTING — baca ini dulu!)
-
-❗ **JANGAN mengetik URL manual seperti `localhost:6080` atau `...cloudshell.net:6080` di browser HP/laptop — pasti gagal.** Port 6080 hanya bisa diakses lewat fitur built-in Cloud Shell yang mengubah URL-nya menjadi subdomain khusus.
-
-✅ Cara yang benar (di halaman Cloud Shell, bukan Termux):
-1. Lihat **baris bawah** jendela terminal Cloud Shell, ada tulisan seperti:
-   `Port 6080 is served on https://...cs-...-6080.cs.cloudshell.dev` — **klik link tersebut**.
-2. Atau klik ikon **"Open web preview"** (ikon jendela kecil dengan tanda panah ↗) di toolbar bawah, lalu pilih **port 6080**.
-3. Atau klik ikon **"Change configuration"** (⧉/gear di samping tombol Web preview) → **Preview on port** → ketik `6080` → Connect.
-4. Halaman noVNC terbuka → klik **Connect** (tanpa password) → desktop LXDE muncul.
-
-Jika link port tidak muncul di baris bawah, pastikan stack berjalan: `pgrep -a novnc` dan `pgrep -a x11vnc`. Jika kosong, jalankan `bash start-desktop.sh` lagi.
-
-### Jalankan aplikasi (mis. Discord)
-Di dalam desktop: menu LXDE → Terminal. Contoh pakai Chromium (versi web Discord):
-```bash
-sudo apt-get install -y chromium
-chromium --no-sandbox https://discord.com/app
-```
-Macro klik di dalam desktop dengan `xdotool`:
-```bash
-sudo apt-get install -y xdotool
-xdotool search --name "Discord" windowactivate key Return   # contoh interaksi
-```
+Log untuk diagnosa: `/tmp/xvfb.log`, `/tmp/lxsession.log`, `/tmp/startlxde.log`, `/tmp/x11vnc.log`, `/tmp/novnc.log`
 
 ---
 
-## 3. Jaga sesi agar tidak timeout (anti-idle 60 menit)
+## Ringkasan harian (setelah restart 24 jam)
 
 ```bash
-nohup bash keepalive.sh > /dev/null 2>&1 &    # mulai: simulasi aktivitas tiap 5 menit
-pgrep -f keepalive.sh                          # cek status (tampil PID = jalan)
-pkill -f keepalive.sh                          # hentikan
+# Langkah 1
+sudo apt-get update && sudo apt-get install -y --no-install-recommends lxde x11vnc novnc websockify dbus-x11 xterm xdotool net-tools
+# Langkah 2-6 (copy-paste berurutan), lalu:
+nohup bash -c 'while true; do sleep 300; printf " "; done' >/dev/null 2>&1 &   # Langkah 7
 ```
-
-**Tidak perlu membuka 2 terminal.** Perintah di atas menjalankan keepalive di *latar belakang* dengan `nohup ... &`, sehingga terminal yang sama tetap bisa dipakai untuk perintah lain, dan prosesnya selamat meski tab/browser ditutup. Kamu cukup satu terminal untuk semuanya:
-
-```bash
-# contoh alur lengkap dalam SATU terminal:
-bash install-desktop.sh
-bash start-desktop.sh
-nohup bash keepalive.sh > /dev/null 2>&1 &     # <- masuk background, terminal tetap bebas
-chromium https://discord.com/app &             # aplikasi lain juga bisa &
-```
-
-Opsional watchdog (auto-restart stack desktop jika ada proses mati):
-```bash
-nohup bash cloudshell-watcher.sh > /dev/null 2>&1 &
-```
-
-Catatan: VNC/browser yang terbuka **tidak** dihitung sebagai aktivitas oleh Cloud Shell — hanya input ke terminal. Karena itu `keepalive.sh` wajib dijalankan dari terminal.
-
----
-
-## 4. Menyambung ulang setelah browser/Termux ditutup
-
-**Fakta kunci:** menutup browser/SSH **tidak** menghentikan instance selama masih dalam batas idle/24 jam. Proses desktop tetap jalan.
-
-### Cara A — browser
-Buka ulang [shell.cloud.google.com](https://shell.cloud.google.com). Jika instance masih hidup, kamu tersambung ke sesi yang sama (terminal memang terlihat fresh, tapi proses latar belakang tetap aktif). Cek:
-```bash
-pgrep -a x11vnc && echo "desktop masih jalan"
-```
-Lalu buka lagi via Web preview port 6080.
-
-### Cara B — Termux (SSH tunnel)
-
-> ⚠️ **Sering salah paham:** port **5900 tidak bisa dibuka langsung** dari browser HP maupun "Open on port" Cloud Shell. Port itu hanya bisa diakses *dari dalam instance* — makanya butuh SSH tunnel. Selain itu browser tidak mengerti protokol mentah VNC, jadi yang dibuka di browser selalu **noVNC (6080)**, bukan 5900.
-
-1. Prepare sekali di Termux:
-   ```bash
-   pkg install -y openssh git
-   ```
-2. Di halaman Cloud Shell (browser), klik ikon panah kecil di dekat prompt `>_cloudshell@...` → **"Connect via SSH"** (Start/Customize) → salin perintah ssh lengkap, bentuknya kira-kira:
-   ```
-   ssh -p 6022 -i ~/.ssh/<kunci> -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" \
-       USERNAME-PROFILNAME@REGION-cLOUDSHELL-PROJECTID.cloudshell.dev
-   ```
-3. Edit `connect-termux.sh` bagian `CS_SSH_BASE`, tempel perintah ssh tadi.
-4. Jalankan di Termux:
-   ```bash
-   bash connect-termux.sh
-   ```
-   Skrip akan: mengecek/menyalakan desktop + keep-alive di server, lalu membuat tunnel `-L 6080:localhost:6080`.
-5. Buka browser HP: `http://localhost:6080/vnc.html` → kosongkan password → **Connect**.
-
-Kalau kamu sudah punya terminal SSH aktif ke Cloud Shell dari Termux, cara manualnya cukup satu perintah:
-```bash
-ssh -p 6022 <ARGUMEN_SAMA> -N -L 6080:localhost:6080 &
-# biarkan jalan di background, lalu buka http://localhost:6080/vnc.html
-```
-
-Jika terminal baru terasa "fresh" tapi `pgrep x11vnc` kosong → instance sudah restart → ulangi langkah bagian 2 (instalasi paket hilang, tapi `$HOME` aman).
-
----
-
-## 5. Batasan realistis (jujur soal ini)
-
-- **Restart ±24 jam wajib manual**: tidak ada API publik untuk membangunkan Cloud Shell dari luar (Koyeb/cron tidak bisa). Kamu harus buka tab Cloud Shell minimal sekali sehari.
-- **Game/cloud gaming berat tidak cocok**: CPU throttling, tanpa GPU. Discord + macro klik ringan masih oke.
-- Keamanan: x11vnc hanya listen di `127.0.0.1`; akses eksternal semata-mata lewat HTTPS forwarding milik akunmu. Tambahkan `-passwd` pada x11vnc bila perlu.
-
-## 6. Daftar isi repo
-
-| File | Fungsi |
-|---|---|
-| `install-desktop.sh` | Pasang paket LXDE + VNC/noVNC |
-| `start-desktop.sh` | Jalankan stack desktop (idempoten) |
-| `keepalive.sh` | Anti-idle (aktivitas palsu tiap 5 menit) |
-| `cloudshell-watcher.sh` | Watchdog auto-restart stack |
-| `connect-termux.sh` | Reconnect via SSH tunnel dari Termux |
-| `reset-desktop.sh` | Reset ringan (purge paket desktop) |
-| `factory-reset.sh` | Panduan reset total `$HOME` |
-| `desktop-lxde.sh` | Versi portabel satu-skrip (Codespaces juga bisa) |
+Lalu buka Web Preview port 6080. Selesai.
