@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# start-desktop.sh — jalankan LXDE di Cloud Shell (tanpa sudo, tanpa root)
+# Cara pakai:  bash start-desktop.sh
+set -e
+
+export DISPLAY=:99
+RES="1280x800x24"      # resolusi desktop, ubah sesuai selera
+VNC_PORT=5900
+NOVNC_PORT=6080
+
+echo "[1/5] Membersihkan sesi lama..."
+pkill -f "novnc --listen $NOVNC_PORT" 2>/dev/null || true
+pkill x11vnc 2>/dev/null || true
+pkill -f startlxde 2>/dev/null || true
+pkill lxsession 2>/dev/null || true
+rm -f /tmp/.X11-unix/X99 /tmp/.X99-lock 2>/dev/null || true
+sleep 1
+
+echo "[2/5] Menjalankan X server virtual (Xvfb $DISPLAY)..."
+Xvfb $DISPLAY -screen 0 $RES >/tmp/xvfb.log 2>&1 &
+sleep 2
+
+echo "[3/5] Menjalankan D-Bus + LXDE session..."
+eval $(dbus-launch --sh-syntax)
+export DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID
+lxsession >/tmp/lxsession.log 2>&1 &
+sleep 2
+startlxde >/tmp/lxde.log 2>&1 &
+sleep 3
+
+echo "[4/5] Menjalankan VNC server (port $VNC_PORT)..."
+x11vnc -display $DISPLAY -forever -shared -rfbport $VNC_PORT -nopw \
+       -bg -o /tmp/x11vnc.log >/dev/null 2>&1
+sleep 1
+
+echo "[5/5] Menjalankan noVNC web client (port $NOVNC_PORT)..."
+if [ -x /usr/share/novnc/utils/novnc_proxy ]; then
+  nohup /usr/share/novnc/utils/novnc_proxy --vnc localhost:$VNC_PORT \
+         --listen $NOVNC_PORT >/tmp/novnc.log 2>&1 &
+elif command -v websockify >/dev/null 2>&1; then
+  nohup websockify --web=/usr/share/novnc $NOVNC_PORT localhost:$VNC_PORT \
+       >/tmp/novnc.log 2>&1 &
+else
+  echo "ERROR: novnc/websockify belum terpasang. Jalankan dulu install-desktop.sh"
+  exit 1
+fi
+sleep 3
+
+echo ""
+echo "=========================================================="
+echo " LXDE sudah jalan! Buka lewat menu Cloud Shell:"
+echo "   ikon 'Web preview' (gambar jendela+gigi) -> Port $NOVNC_PORT"
+echo " URL-nya otomatis jadi https://...cs-...-$NOVNC_PORT.cs.cloudshell.dev"
+echo " Kosongkan password VNC lalu klik Connect."
+echo "=========================================================="
