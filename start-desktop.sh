@@ -8,7 +8,12 @@ RES="1280x800x24"      # resolusi desktop, ubah sesuai selera
 VNC_PORT=5900
 NOVNC_PORT=6080
 
+# Jangan pakai set -e di bagian ini: pkill mengembalikan kode non-zero
+# saat tidak ada proses yang cocok, yang akan membuat skrip berhenti diam-diam.
+set +e
+
 echo "[1/5] Membersihkan sesi lama..."
+pkill -x Xvfb 2>/dev/null || true
 pkill -f "novnc --listen $NOVNC_PORT" 2>/dev/null || true
 pkill x11vnc 2>/dev/null || true
 pkill -f startlxde 2>/dev/null || true
@@ -27,6 +32,12 @@ lxsession >/tmp/lxsession.log 2>&1 &
 sleep 2
 startlxde >/tmp/lxde.log 2>&1 &
 sleep 3
+
+if ! pgrep -x Xvfb >/dev/null; then
+  echo "ERROR: Xvfb mati. Isi /tmp/xvfb.log:"
+  tail -10 /tmp/xvfb.log
+  exit 1
+fi
 
 echo "[4/5] Menjalankan VNC server (port $VNC_PORT)..."
 
