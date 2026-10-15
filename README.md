@@ -57,9 +57,18 @@ bash start-desktop.sh       # Xvfb :99 → lxsession/startlxde → x11vnc:5900 �
 
 `start-desktop.sh` bersifat idempoten — jalankan ulang kapan saja untuk restart stack tanpa instalasi ulang.
 
-### Buka desktop di browser
-- Cloud Shell: menu **"Web preview" → Change configuration → Preview on port 6080** → klik **Connect** (tanpa password).
-- Jika muncul error CORS/403 pada "Open on port", gunakan Web preview (bukan Open on port biasa).
+### Buka desktop di browser (PENTING — baca ini dulu!)
+
+❗ **JANGAN mengetik URL manual seperti `localhost:6080` atau `...cloudshell.net:6080` di browser HP/laptop — pasti gagal.** Port 6080 hanya bisa diakses lewat fitur built-in Cloud Shell yang mengubah URL-nya menjadi subdomain khusus.
+
+✅ Cara yang benar (di halaman Cloud Shell, bukan Termux):
+1. Lihat **baris bawah** jendela terminal Cloud Shell, ada tulisan seperti:
+   `Port 6080 is served on https://...cs-...-6080.cs.cloudshell.dev` — **klik link tersebut**.
+2. Atau klik ikon **"Open web preview"** (ikon jendela kecil dengan tanda panah ↗) di toolbar bawah, lalu pilih **port 6080**.
+3. Atau klik ikon **"Change configuration"** (⧉/gear di samping tombol Web preview) → **Preview on port** → ketik `6080` → Connect.
+4. Halaman noVNC terbuka → klik **Connect** (tanpa password) → desktop LXDE muncul.
+
+Jika link port tidak muncul di baris bawah, pastikan stack berjalan: `pgrep -a novnc` dan `pgrep -a x11vnc`. Jika kosong, jalankan `bash start-desktop.sh` lagi.
 
 ### Jalankan aplikasi (mis. Discord)
 Di dalam desktop: menu LXDE → Terminal. Contoh pakai Chromium (versi web Discord):
