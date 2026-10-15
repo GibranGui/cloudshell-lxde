@@ -114,16 +114,31 @@ pgrep -a x11vnc && echo "desktop masih jalan"
 Lalu buka lagi via Web preview port 6080.
 
 ### Cara B — Termux (SSH tunnel)
+
+> ⚠️ **Sering salah paham:** port **5900 tidak bisa dibuka langsung** dari browser HP maupun "Open on port" Cloud Shell. Port itu hanya bisa diakses *dari dalam instance* — makanya butuh SSH tunnel. Selain itu browser tidak mengerti protokol mentah VNC, jadi yang dibuka di browser selalu **noVNC (6080)**, bukan 5900.
+
 1. Prepare sekali di Termux:
    ```bash
-   pkg install -y openssh
+   pkg install -y openssh git
    ```
-2. Dapatkan akses SSH (dari mesin lain: `gcloud cloud-shell ssh`, atau salin perintah connect dari menu Cloud Shell).
-3. Dari Termux, jalankan skrip reconnect:
+2. Di halaman Cloud Shell (browser), klik ikon panah kecil di dekat prompt `>_cloudshell@...` → **"Connect via SSH"** (Start/Customize) → salin perintah ssh lengkap, bentuknya kira-kira:
+   ```
+   ssh -p 6022 -i ~/.ssh/<kunci> -o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" \
+       USERNAME-PROFILNAME@REGION-cLOUDSHELL-PROJECTID.cloudshell.dev
+   ```
+3. Edit `connect-termux.sh` bagian `CS_SSH_BASE`, tempel perintah ssh tadi.
+4. Jalankan di Termux:
    ```bash
-   bash connect-termux.sh <USER>@<INSTANCE>.cloudshell.dev -p 6022
+   bash connect-termux.sh
    ```
-   Skrip membuat tunnel `-L 6080:localhost:6080`, lalu buka browser HP: `http://localhost:6080/vnc.html` → Connect.
+   Skrip akan: mengecek/menyalakan desktop + keep-alive di server, lalu membuat tunnel `-L 6080:localhost:6080`.
+5. Buka browser HP: `http://localhost:6080/vnc.html` → kosongkan password → **Connect**.
+
+Kalau kamu sudah punya terminal SSH aktif ke Cloud Shell dari Termux, cara manualnya cukup satu perintah:
+```bash
+ssh -p 6022 <ARGUMEN_SAMA> -N -L 6080:localhost:6080 &
+# biarkan jalan di background, lalu buka http://localhost:6080/vnc.html
+```
 
 Jika terminal baru terasa "fresh" tapi `pgrep x11vnc` kosong → instance sudah restart → ulangi langkah bagian 2 (instalasi paket hilang, tapi `$HOME` aman).
 
