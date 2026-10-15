@@ -50,7 +50,7 @@ df -h / $HOME
 ## 2. Instalasi LXDE (dari awal)
 
 ```bash
-git clone <URL_REPO_INI> && cd cloudshell-lxde
+git clone https://github.com/GibranGui/cloudshell-lxde && cd cloudshell-lxde
 bash install-desktop.sh     # apt install lxde x11vnc novnc websockify dbus-x11 xterm (~150 MB)
 bash start-desktop.sh       # Xvfb :99 → lxsession/startlxde → x11vnc:5900 → noVNC:6080
 ```
