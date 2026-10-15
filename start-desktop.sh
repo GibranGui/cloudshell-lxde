@@ -29,14 +29,34 @@ startlxde >/tmp/lxde.log 2>&1 &
 sleep 3
 
 echo "[4/5] Menjalankan VNC server (port $VNC_PORT)..."
-x11vnc -display $DISPLAY -forever -shared -rfbport $VNC_PORT -nopw \
-       -bg -o /tmp/x11vnc.log >/dev/null 2>&1
-sleep 1
-if ! pgrep -x x11vnc >/dev/null; then
-  echo "ERROR: x11vnc gagal start. Cek: tail -20 /tmp/x11vnc.log"
-  echo "Jika paket belum terpasang, jalankan: bash install-desktop.sh"
+
+# Deteksi dini: apakah x11vnc & novnc sudah terpasang?
+MISSING=""
+command -v x11vnc   >/dev/null 2>&1 || MISSING="$MISSING x11vnc"
+{ [ -x /usr/share/novnc/utils/novnc_proxy ] || command -v websockify >/dev/null 2>&1; } \
+  || MISSING="$MISSING novnc/websockify"
+if [ -n "$MISSING" ]; then
+  echo "ERROR: Paket belum terpasang:$MISSING"
+  echo "Jalankan dulu: sudo apt-get update && sudo apt-get install -y --no-install-recommends lxde x11vnc novnc websockify dbus-x11 xterm"
+  echo "(atau: bash install-desktop.sh)"
   exit 1
 fi
+
+# Bersihkan x11vnc lama agar tidak bentrok port
+pkill -x x11vnc 2>/dev/null; sleep 1
+
+x11vnc -display $DISPLAY -forever -shared -rfbport $VNC_PORT -nopw \
+       -bg -o /tmp/x11vnc.log >/dev/null 2>&1
+sleep 2
+if ! pgrep -x x11vnc >/dev/null; then
+  echo "ERROR: x11vnc gagal start. Isi log:"
+  echo "----------------- /tmp/x11vnc.log -----------------"
+  tail -20 /tmp/x11vnc.log 2>/dev/null || echo "(log kosong — x11vnc bahkan tidak sempat menulis)"
+  echo "--------------------------------------------------------"
+  echo "Cek juga: DISPLAY=$DISPLAY, Xvfb hidup? -> pgrep -a Xvfb"
+  exit 1
+fi
+echo "OK: x11vnc jalan (PID $(pgrep -x x11vnc | head -1)) di port $VNC_PORT"
 
 echo "[5/5] Menjalankan noVNC web client (port $NOVNC_PORT)..."
 if [ -x /usr/share/novnc/utils/novnc_proxy ]; then
