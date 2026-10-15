@@ -32,6 +32,11 @@ echo "[4/5] Menjalankan VNC server (port $VNC_PORT)..."
 x11vnc -display $DISPLAY -forever -shared -rfbport $VNC_PORT -nopw \
        -bg -o /tmp/x11vnc.log >/dev/null 2>&1
 sleep 1
+if ! pgrep -x x11vnc >/dev/null; then
+  echo "ERROR: x11vnc gagal start. Cek: tail -20 /tmp/x11vnc.log"
+  echo "Jika paket belum terpasang, jalankan: bash install-desktop.sh"
+  exit 1
+fi
 
 echo "[5/5] Menjalankan noVNC web client (port $NOVNC_PORT)..."
 if [ -x /usr/share/novnc/utils/novnc_proxy ]; then
@@ -45,6 +50,10 @@ else
   exit 1
 fi
 sleep 3
+if ! curl -s -o /dev/null http://localhost:$NOVNC_PORT/vnc.html; then
+  echo "ERROR: noVNC tidak merespon di port $NOVNC_PORT. Cek: tail -20 /tmp/novnc.log"
+  exit 1
+fi
 
 echo ""
 echo "=========================================================="
